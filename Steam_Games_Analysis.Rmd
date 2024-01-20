@@ -1,0 +1,93 @@
+---
+title: 'Project 1: Steam Game Analysis'
+author: "Michael Lucio"
+date: "April 4, 2023"
+output: html_document
+---
+
+<style type="text/css">
+
+h1.title {
+  font-size: 30px;
+  text-align: center;
+}
+h4.author { 
+  font-size: 26px;
+  text-align: center;
+}
+h4.date { 
+  font-size: 18px;
+  text-align: center;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# **Introduction**
+In our project we will be cleaning a data set found on Kaggle and analyzing it to find the top 50 games on the steam store based on popularity.
+
+#### **The Libraries**
+These are the libraries we will using for this project. We have the basic libraries such as `ggplot2`,`dplyr`, and `tidyr` which we will be using for plotting and manipulating our data. 
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+```
+
+#### **The Data**
+```{r}
+# Load Data
+steam_data <- read.csv("steam-200k.csv")
+colnames(steam_data) <- c('user_id', 'game_id', 'action', 'hours', 'null')
+steam_data$null <- NULL
+head(steam_data,10)
+```
+Clean the data further by widening and consolidating.
+```{r}
+steam_clean <- steam_data %>%
+  group_by(user_id, game_id) %>%
+  mutate(rn = row_number()) %>%
+  pivot_wider(names_from = action, values_from = hours) %>%
+  select(-rn) %>%
+  summarise_if(is.numeric,sum,na.rm = TRUE)
+colnames(steam_clean)[3] <- 'hours_played'
+head(steam_clean)
+```
+Analyze the Data
+```{r}
+total_games <- length(unique(steam_clean$game_id))
+total_users <- length(unique(steam_clean$user_id))
+cat("They are",total_games, "unique games purchased by",total_users, "unique users.")
+
+# Most Purchased Games
+games_most_purchased <- steam_clean %>%
+  select(game_id,purchase) %>%
+  group_by(game_id) %>%
+  summarise(total_purchases=sum(purchase)) %>%
+  arrange(desc(total_purchases))
+head(games_most_purchased)
+
+# Most Played games
+games_most_played <- steam_clean %>%
+  select(game_id,hours_played) %>%
+  group_by(game_id) %>%
+  summarise(total_hours=sum(hours_played)) %>%
+  arrange(desc(total_hours)) 
+head(games_most_played)
+```
+
+
+```{r}
+top50_games <- merge(games_most_purchased, games_most_played, by = 'game_id') %>%
+  arrange(desc(total_purchases))
+top50_games <- head(top50_games, 50)
+top50_games
+ggplot(top50_games, aes(x = game_id, y = total_purchases, fill = total_hours)) + 
+    geom_bar(stat = "identity") + 
+    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
+    labs(title = "Top 50 Games on Steam based on Popularity", x = "Game", y = "Total Purchases")
+```
+  
+
